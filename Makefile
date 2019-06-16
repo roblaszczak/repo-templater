@@ -2,4 +2,4 @@ test:
 	go test ./...
 
 install:
-	go install cmd/repo-templater/main.go
+	cd cmd/repo-templater && go install
