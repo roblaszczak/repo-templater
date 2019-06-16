@@ -1,0 +1,22 @@
+[[repositories]]
+Name = "lib-1"
+HumanName = "Library 1"
+URL = "http://github.com/roblaszczak/lib-1"
+Templates = ["license", "lib"]
+
+    [repositories.Variables]
+        Licence = "MIT"
+        Author = "Robert Laszczak"
+        GoPackage = "github.com/roblaszczak/lib-1"
+
+[[repositories]]
+Name = "service-1"
+HumanName = "Service 1"
+URL = "http://github.com/roblaszczak/service-1"
+Templates = ["license", "service"]
+
+    [repositories.Variables]
+        Licence = "BSD"
+        Author = "Three Dots Labs"
+        GoPackage = "github.com/roblaszczak/lib-1"
+        RunCommandDirectory = "cmd/app"

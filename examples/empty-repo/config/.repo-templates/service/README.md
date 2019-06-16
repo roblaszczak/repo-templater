@@ -1,0 +1,5 @@
+# {{ .HumanName }}
+
+## Running
+
+    make run
