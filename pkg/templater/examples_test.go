@@ -5,8 +5,6 @@ import (
 	"github.com/roblaszczak/repo-templater/pkg/templater"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/config"
 	"io/ioutil"
 	"log"
 	"os"
@@ -103,27 +101,6 @@ func removeContents(t *testing.T, dir string) {
 		err = os.RemoveAll(filepath.Join(dir, name))
 		require.NoError(t, err)
 	}
-}
-
-func prepareRepositories(t *testing.T) {
-	repo, err := git.PlainInit("./repos", true)
-	require.NoError(t, err)
-
-	_, err = repo.CreateRemote(&config.RemoteConfig{
-		Name: "myrepo",
-		URLs: []string{"ssh://git@localhost/git-server/repos/myrepo.git"},
-	})
-	require.NoError(t, err)
-
-	worktree, err := repo.Worktree()
-	require.NoError(t, err)
-
-	_, err = worktree.Add(".")
-	require.NoError(t, err)
-
-	_, err = worktree.Commit("foo", nil)
-	require.NoError(t, err)
-
 }
 
 func assertDirectoriesEquals(t *testing.T, expectedDirectory, actualDirectory string) {

@@ -1,0 +1,10 @@
+[[repositories]]
+Name = "lib-1"
+HumanName = "Library 1"
+URL = "http://github.com/roblaszczak/lib-1"
+Templates = ["lib"]
+
+    [repositories.Variables]
+        Licence = "MIT"
+        Author = "Robert Laszczak"
+        GoPackage = "github.com/roblaszczak/lib-1"

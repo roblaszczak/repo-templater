@@ -1,17 +1,26 @@
 package main
 
 import (
+	"flag"
 	"github.com/roblaszczak/repo-templater/pkg/templater"
 	"log"
 	"os"
 )
 
 func main() {
+	commitMsg := flag.String("commit-msg", "update repository template", "")
+	push := flag.Bool("push", false, "")
+	flag.Parse()
+
+	logger := log.New(os.Stderr, "[templater] ", log.LstdFlags)
+
 	t := templater.Templater{
 		InputDirectory:  "input",
 		OutputDirectory: "input",
 		ConfigDirectory: ".",
-		Logger:          log.New(os.Stderr, "[example] ", log.LstdFlags),
+		CommitMessage:   *commitMsg,
+		Push:            *push,
+		Logger:          logger,
 	}
 	config, err := t.ParseConfig(".")
 	if err != nil {
@@ -28,11 +37,13 @@ func main() {
 		panic(err)
 	}
 
-	if err := t.ReallyRun(config); err != nil {
-		panic(err)
-	}
+	defer func() {
+		if err := os.RemoveAll("input"); err != nil {
+			logger.Printf("cannot remove dir: %s", err)
+		}
+	}()
 
-	if err := os.RemoveAll("input"); err != nil {
+	if err := t.ReallyRun(config); err != nil {
 		panic(err)
 	}
 }

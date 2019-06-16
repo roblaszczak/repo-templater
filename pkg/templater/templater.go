@@ -21,6 +21,8 @@ type Templater struct {
 	InputDirectory  string
 	OutputDirectory string
 	ConfigDirectory string
+	CommitMessage   string
+	Push            bool
 	Logger          *log.Logger
 }
 
@@ -40,60 +42,53 @@ func (t Templater) ReallyRun(config Config) error {
 		return err
 	}
 
+	var repositoriesWithChanges []RepositoryConfig
+
 	for _, repository := range config.Repositories {
-		cmd := exec.Command("git", "add", ".")
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		cmd.Dir = path.Join(t.InputDirectory, repository.Name)
+		repositoryDir := path.Join(t.InputDirectory, repository.Name)
 
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
+		if err := t.gitAdd(repositoryDir, "."); err != nil {
+			return errors.Wrapf(err, "git add failed for %s", repository.Name)
 		}
 
-		cmd = exec.Command("git", "--no-pager", "diff", "--cached")
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		cmd.Dir = path.Join(t.InputDirectory, repository.Name)
-
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
+		fmt.Printf("\nDiff for repository %s\n", repository.Name)
+		if err := t.showGitDiff(repositoryDir); err != nil {
+			return errors.Wrapf(err, "cannot show diff %s", repository.Name)
 		}
 
-		cmd = exec.Command("git", "status", "--porcelain")
-		cmd.Stderr = os.Stderr
-		statusBuf := bytes.NewBuffer(nil)
-		cmd.Stdout = statusBuf
-		cmd.Dir = path.Join(t.InputDirectory, repository.Name)
-
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
+		needCommit, err := t.hasUncommittedChanges(repositoryDir)
+		if err != nil {
+			return errors.Wrapf(err, "check for changes in %s", repository.Name)
 		}
 
-		if len(statusBuf.String()) == 0 {
-			t.Logger.Printf("no changes detected")
+		if !needCommit {
+			t.Logger.Printf("%s doesn't need update", repository.Name)
 			continue
 		}
 
-		if !prompt() {
+		if !t.Push {
 			continue
 		}
 
-		cmd = exec.Command("git", "commit", "-m", "update repository template")
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		cmd.Dir = path.Join(t.InputDirectory, repository.Name)
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
+		if !prompt("do you want to commit these changes?") {
+			continue
 		}
 
-		cmd = exec.Command("git", "push")
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		cmd.Dir = path.Join(t.InputDirectory, repository.Name)
-
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
+		if err := t.gitCommit(repositoryDir, t.CommitMessage); err != nil {
+			return errors.Wrapf(err, "cannot commit changes in %s", repository.Name)
 		}
+
+		repositoriesWithChanges = append(repositoriesWithChanges, repository)
+	}
+
+	if t.Push {
+		for _, repository := range repositoriesWithChanges {
+			if err := t.gitPush(path.Join(t.InputDirectory, repository.Name)); err != nil {
+				return errors.Wrapf(err, "cannot push %s", repository.Name)
+			}
+		}
+	} else {
+		t.Logger.Println("dry run, not pushing changes, to push please add -push flag")
 	}
 
 	return nil
@@ -207,6 +202,7 @@ func (t Templater) renderFile(sourceFile, destFile string, config RepositoryConf
 	t.Logger.Printf("rendering %s", sourceFile)
 
 	tpl := template.Must(template.New("tpl").Parse(string(input)))
+	tpl.Option("missingkey=error")
 
 	buf := bytes.NewBuffer(nil)
 	if err := tpl.Execute(buf, config); err != nil {
@@ -222,13 +218,15 @@ func (t Templater) renderFile(sourceFile, destFile string, config RepositoryConf
 	return nil
 }
 
-func prompt() bool {
+func prompt(message string) bool {
 	for {
-		fmt.Print("y/n ?")
+		fmt.Printf("%s [y/n]:", message)
+
 		var input string
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 
 		if input == "" {
+			fmt.Print("\n")
 			continue
 		}
 

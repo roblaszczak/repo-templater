@@ -20,3 +20,15 @@ Templates = ["license", "service"]
         Author = "Three Dots Labs"
         GoPackage = "github.com/roblaszczak/lib-1"
         RunCommandDirectory = "cmd/app"
+
+[[repositories]]
+Name = "repo-templater"
+HumanName = "Repo Templater"
+URL = "git@github.com:roblaszczak/repo-templater.git"
+Templates = ["cli"]
+
+    [repositories.Variables]
+        Licence = "MIT"
+        Author = "Robert Laszczak"
+        GoPackage = "github.com/roblaszczak/repo-templater"
+        RunCommandDirectory = "cmd/repo-templater"
