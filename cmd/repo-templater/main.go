@@ -10,6 +10,8 @@ import (
 func main() {
 	commitMsg := flag.String("commit-msg", "update repository template", "")
 	push := flag.Bool("push", false, "")
+	doNotRemove := flag.Bool("do-not-remove", false, "")
+
 	flag.Parse()
 
 	logger := log.New(os.Stderr, "[templater] ", log.LstdFlags)
@@ -38,6 +40,9 @@ func main() {
 	}
 
 	defer func() {
+		if *doNotRemove {
+			return
+		}
 		if err := os.RemoveAll("input"); err != nil {
 			logger.Printf("cannot remove dir: %s", err)
 		}

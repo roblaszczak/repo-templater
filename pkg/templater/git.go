@@ -6,15 +6,19 @@ import (
 	"os/exec"
 )
 
-func (t Templater) runGitCmd(runDirectory string, args ...string) error {
-	cmd := exec.Command("git", args...)
+func (t Templater) runCmd(runDirectory string, cmdToRun ...string) error {
+	cmd := exec.Command(cmdToRun[0], cmdToRun[1:]...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Dir = runDirectory
 
-	t.Logger.Printf("running: git %s in %s", args, runDirectory)
+	t.Logger.Printf("running cmd %s in %s", cmdToRun, runDirectory)
 
 	return cmd.Run()
+}
+
+func (t Templater) runGitCmd(runDirectory string, args ...string) error {
+	return t.runCmd("git", args...)
 }
 
 func (t Templater) gitAdd(runDirectory, toAdd string) error {

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -42,7 +43,7 @@ func (t Templater) ReallyRun(config Config) error {
 		return err
 	}
 
-	var repositoriesWithChanges []RepositoryConfig
+	var repositoriesWithChanges []*RepositoryConfig
 
 	for _, repository := range config.Repositories {
 		repositoryDir := path.Join(t.InputDirectory, repository.Name)
@@ -100,7 +101,83 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 		return config, err
 	}
 
+	for repositoryNum := range config.Repositories {
+		for key, value := range config.CommonVariables {
+			repoConfig := config.Repositories[repositoryNum]
+
+			if _, ok := repoConfig.Variables[key]; !ok {
+				repoConfig.Variables[key] = value
+			}
+		}
+	}
+
+	for repositoryNum := range config.Repositories {
+		repoConfig := config.Repositories[repositoryNum]
+
+		varsToTemplate := []*string{
+			&repoConfig.Name,
+			&repoConfig.HumanName,
+			&repoConfig.URL,
+		}
+
+		variablesToTemplateMap := map[string]*string{}
+
+		for key := range repoConfig.Variables {
+			v := repoConfig.Variables[key]
+			vPtr := &v
+			variablesToTemplateMap[key] = vPtr
+			varsToTemplate = append(varsToTemplate, vPtr)
+		}
+
+	TemplatingLoop:
+		for {
+			toTemplateCount := len(varsToTemplate)
+			templatedCount := 0
+			for _, toTemplate := range varsToTemplate {
+				if !strings.Contains(*toTemplate, "{{") {
+					toTemplateCount--
+					continue
+				}
+
+				nameTemplated := templateVar(*toTemplate, repoConfig)
+				if nameTemplated != "" {
+					*toTemplate = nameTemplated
+					toTemplateCount--
+					templatedCount++
+				}
+			}
+
+			if toTemplateCount == 0 {
+				break TemplatingLoop
+			}
+			if templatedCount == 0 {
+				// todo - err?
+				break TemplatingLoop
+			}
+		}
+
+		for key, value := range variablesToTemplateMap {
+			repoConfig.Variables[key] = *value
+		}
+	}
+
+	for _, value := range config.Repositories {
+		fmt.Println(value.URL)
+	}
+
 	return config, nil
+}
+
+func templateVar(variable string, config *RepositoryConfig) string {
+	tpl := template.Must(template.New("tpl").Parse(variable))
+	tpl.Option("missingkey=error")
+
+	buf := bytes.NewBuffer(nil)
+	if err := tpl.Execute(buf, config); err != nil {
+		return ""
+	}
+
+	return buf.String()
 }
 
 // todo - err wraps
@@ -124,7 +201,7 @@ func (t Templater) Run(config Config) error {
 				destPath := filepath.Join(t.OutputDirectory, repository.Name, path[len(templateDir):])
 				t.Logger.Printf("copying file %s to %s", path, destPath)
 
-				if err := t.renderFile(path, destPath, repository); err != nil {
+				if err := t.renderFile(path, destPath, *repository); err != nil {
 					return err
 				}
 
@@ -134,6 +211,12 @@ func (t Templater) Run(config Config) error {
 
 		if err != nil {
 			return errors.Wrap(err, "cannot read input directory")
+		}
+
+		for _, cmd := range repository.RunCmds {
+			if err := t.runCmd(path.Join(t.OutputDirectory, repository.Name), cmd...); err != nil {
+				return errors.Wrap(err, "cannot run cmd")
+			}
 		}
 	}
 

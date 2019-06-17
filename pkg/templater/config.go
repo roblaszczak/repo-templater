@@ -6,9 +6,13 @@ type RepositoryConfig struct {
 	URL       string
 	Templates []string
 
-	Variables map[string]interface{}
+	Variables map[string]string
+
+	RunCmds [][]string
 }
 
 type Config struct {
-	Repositories []RepositoryConfig
+	Repositories []*RepositoryConfig
+
+	CommonVariables map[string]string
 }

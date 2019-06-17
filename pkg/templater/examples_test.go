@@ -22,6 +22,11 @@ func TestExamples(t *testing.T) {
 
 	for i := range examples {
 		example := examples[i]
+
+		if example == "real-example" {
+			continue
+		}
+
 		exampleDir := path.Join(examplesDir, example)
 
 		configDirectory := path.Join(exampleDir, "config")
@@ -32,7 +37,8 @@ func TestExamples(t *testing.T) {
 		removeContents(t, testOutputDir)
 
 		t.Run(examples[i], func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
+			// todo - reenable
 
 			tplr := templater.Templater{
 				InputDirectory:  inputDirectory,
