@@ -18,7 +18,7 @@ func (t Templater) runCmd(runDirectory string, cmdToRun ...string) error {
 }
 
 func (t Templater) runGitCmd(runDirectory string, args ...string) error {
-	return t.runCmd("git", args...)
+	return t.runCmd(runDirectory, append([]string{"git"}, args...)...)
 }
 
 func (t Templater) gitAdd(runDirectory, toAdd string) error {

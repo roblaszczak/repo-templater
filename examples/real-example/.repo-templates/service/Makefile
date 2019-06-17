@@ -1,5 +1,5 @@
 run
-	go run {{ .Variables.RunCommandDirectory }}/*.go
+	go run {{ .RunCommandDirectory }}/*.go
 
 test:
 	go test ./...

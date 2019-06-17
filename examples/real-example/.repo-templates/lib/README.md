@@ -2,4 +2,4 @@
 
 ## Installing
 
-    go get {{ .Variables.GoPackage }}
+    go get {{ .GoPackage }}

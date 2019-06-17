@@ -1,6 +1,6 @@
 package subdir
 
-// Created By: {{ .Variables.Author }}
+// Created By: {{ .Author }}
 func Foo2() {
 
 }

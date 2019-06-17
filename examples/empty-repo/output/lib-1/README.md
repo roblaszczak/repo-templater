@@ -4,9 +4,7 @@
 
     go get github.com/roblaszczak/lib-1
 
+## Development
 
-## foo
+git clone git@github.com:roblaszczak/lib-1.git
 
-git clone http://github.com/roblaszczak/lib-1
-
-lib-1_foo

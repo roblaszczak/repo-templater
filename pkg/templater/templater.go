@@ -131,19 +131,27 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 
 	TemplatingLoop:
 		for {
+			for key, value := range variablesToTemplateMap {
+				repoConfig.Variables[key] = *value
+			}
+
 			toTemplateCount := len(varsToTemplate)
 			templatedCount := 0
 			for _, toTemplate := range varsToTemplate {
-				if !strings.Contains(*toTemplate, "{{") {
+				if !isTemplated(*toTemplate) {
 					toTemplateCount--
 					continue
 				}
+
+				fmt.Println(makeTemplateVariables(*repoConfig))
 
 				nameTemplated := templateVar(*toTemplate, repoConfig)
 				if nameTemplated != "" {
 					*toTemplate = nameTemplated
 					toTemplateCount--
 					templatedCount++
+					fmt.Println("templated ", nameTemplated)
+					continue TemplatingLoop
 				}
 			}
 
@@ -152,17 +160,10 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 			}
 			if templatedCount == 0 {
 				// todo - err?
+				fmt.Printf("cannot template more, missing templates: %d\n", toTemplateCount)
 				break TemplatingLoop
 			}
 		}
-
-		for key, value := range variablesToTemplateMap {
-			repoConfig.Variables[key] = *value
-		}
-	}
-
-	for _, value := range config.Repositories {
-		fmt.Println(value.URL)
 	}
 
 	return config, nil
@@ -173,11 +174,20 @@ func templateVar(variable string, config *RepositoryConfig) string {
 	tpl.Option("missingkey=error")
 
 	buf := bytes.NewBuffer(nil)
-	if err := tpl.Execute(buf, config); err != nil {
+	if err := tpl.Execute(buf, makeTemplateVariables(*config)); err != nil {
 		return ""
 	}
 
-	return buf.String()
+	s := buf.String()
+	if isTemplated(s) {
+		return ""
+	}
+
+	return s
+}
+
+func isTemplated(s string) bool {
+	return strings.Contains(s, "{{") && strings.Contains(s, "}}")
 }
 
 // todo - err wraps
@@ -288,7 +298,7 @@ func (t Templater) renderFile(sourceFile, destFile string, config RepositoryConf
 	tpl.Option("missingkey=error")
 
 	buf := bytes.NewBuffer(nil)
-	if err := tpl.Execute(buf, config); err != nil {
+	if err := tpl.Execute(buf, makeTemplateVariables(config)); err != nil {
 		// todo - why it is not propagating when occurred?
 		return err
 	}

@@ -1,27 +1,27 @@
 [CommonVariables]
-CommonVar1 = "foo"
+GithubUser = "roblaszczak"
+URLTemplate = "git@github.com:{{ .GithubUser }}/{{ .Name }}.git"
 
 [[repositories]]
 Name = "lib-1"
 HumanName = "Library 1"
-URL = "http://{{ .Variables.GoPackage }}"
+URL = "{{ .URLTemplate }}"
 Templates = ["license", "lib"]
 RunCmds = [["touch", "cmd-file"]]
 
     [repositories.Variables]
         Licence = "MIT"
         Author = "Robert Laszczak"
-        GoPackage = "github.com/roblaszczak/lib-1"
-        TemplatedVariable = "{{ .Name }}_foo"
+        GoPackage = "github.com/{{ .GithubUser }}/{{ .Name }}"
 
 [[repositories]]
 Name = "service-1"
 HumanName = "Service 1"
-URL = "http://github.com/roblaszczak/service-1"
+URL = "{{ .URLTemplate }}"
 Templates = ["license", "service"]
 
     [repositories.Variables]
         Licence = "BSD"
         Author = "Three Dots Labs"
-        GoPackage = "github.com/roblaszczak/lib-1"
+        GoPackage = "github.com/{{ .GithubUser }}/{{ .Name }}"
         RunCommandDirectory = "cmd/app"

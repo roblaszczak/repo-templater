@@ -2,11 +2,9 @@
 
 ## Installing
 
-    go get {{ .Variables.GoPackage }}
+    go get {{ .GoPackage }}
 
-
-## {{ .Variables.CommonVar1 }}
+## Development
 
 git clone {{ .URL }}
 
-{{ .Variables.TemplatedVariable }}
