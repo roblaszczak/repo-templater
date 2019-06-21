@@ -48,7 +48,7 @@ func main() {
 		}
 	}()
 
-	if err := t.ReallyRun(config); err != nil {
+	if err := t.ReallyRun(*config); err != nil {
 		panic(err)
 	}
 }

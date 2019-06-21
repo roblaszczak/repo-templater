@@ -2,9 +2,9 @@
 
 ## Installing
 
-    go get github.com/roblaszczak/lib-1
+    go get github.com/ThreeDotsLabs/lib-1
 
 ## Development
 
-git clone git@github.com:roblaszczak/lib-1.git
+git clone git@github.com:ThreeDotsLabs/lib-1.git
 

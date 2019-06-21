@@ -11,8 +11,8 @@ type RepositoryConfig struct {
 	RunCmds [][]string
 }
 
-func makeTemplateVariables(repoConfig RepositoryConfig) map[string]string {
-	vars := map[string]string{}
+func makeTemplateVariables(repoConfig RepositoryConfig, config Config) map[string]interface{} {
+	vars := map[string]interface{}{}
 
 	for key, value := range repoConfig.Variables {
 		vars[key] = value
@@ -21,6 +21,7 @@ func makeTemplateVariables(repoConfig RepositoryConfig) map[string]string {
 	vars["Name"] = repoConfig.Name
 	vars["HumanName"] = repoConfig.HumanName
 	vars["URL"] = repoConfig.URL
+	vars["Config"] = config
 
 	return vars
 }

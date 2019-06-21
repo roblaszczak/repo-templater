@@ -67,7 +67,7 @@ func TestExamples(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.NoError(t, tplr.Run(config))
+			require.NoError(t, tplr.Run(*config))
 
 			assertDirectoriesEquals(t, expectedOutputDirectory, testOutputDir)
 		})

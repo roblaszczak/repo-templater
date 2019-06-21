@@ -13,6 +13,7 @@ RunCmds = [["touch", "cmd-file"]]
         Licence = "MIT"
         Author = "Robert Laszczak"
         GoPackage = "github.com/{{ .GithubUser }}/{{ .Name }}"
+        GithubUser = "ThreeDotsLabs" # overriden
 
 [[repositories]]
 Name = "service-1"

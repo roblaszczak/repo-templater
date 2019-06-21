@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 )
 
@@ -28,16 +29,25 @@ type Templater struct {
 }
 
 func (t Templater) ReallyRun(config Config) error {
-	for _, repository := range config.Repositories {
-		cmd := exec.Command("git", "clone", repository.URL, repository.Name)
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		cmd.Dir = t.InputDirectory
+	cloneWg := sync.WaitGroup{}
+	cloneWg.Add(len(config.Repositories))
 
-		if err := cmd.Run(); err != nil {
-			return errors.Wrapf(err, "cannot clone %s", repository.Name)
-		}
+	for i := range config.Repositories {
+		go func(repository *RepositoryConfig) {
+			cmd := exec.Command("git", "clone", repository.URL, repository.Name)
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			cmd.Dir = t.InputDirectory
+
+			if err := cmd.Run(); err != nil {
+				panic(errors.Wrapf(err, "cannot clone %s", repository.Name))
+			}
+
+			cloneWg.Done()
+		}(config.Repositories[i])
 	}
+
+	cloneWg.Wait()
 
 	if err := t.Run(config); err != nil {
 		return err
@@ -95,16 +105,19 @@ func (t Templater) ReallyRun(config Config) error {
 	return nil
 }
 
-func (t Templater) ParseConfig(configDir string) (Config, error) {
-	config := Config{}
+func (t Templater) ParseConfig(configDir string) (*Config, error) {
+	config := &Config{}
 	if _, err := toml.DecodeFile(path.Join(configDir, ConfigFile), &config); err != nil {
-		return config, err
+		return nil, err
 	}
 
 	for repositoryNum := range config.Repositories {
 		for key, value := range config.CommonVariables {
 			repoConfig := config.Repositories[repositoryNum]
 
+			if repoConfig.Variables == nil {
+				repoConfig.Variables = map[string]string{}
+			}
 			if _, ok := repoConfig.Variables[key]; !ok {
 				repoConfig.Variables[key] = value
 			}
@@ -143,9 +156,7 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 					continue
 				}
 
-				fmt.Println(makeTemplateVariables(*repoConfig))
-
-				nameTemplated := templateVar(*toTemplate, repoConfig)
+				nameTemplated := templateVar(*toTemplate, repoConfig, config)
 				if nameTemplated != "" {
 					*toTemplate = nameTemplated
 					toTemplateCount--
@@ -159,9 +170,7 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 				break TemplatingLoop
 			}
 			if templatedCount == 0 {
-				// todo - err?
-				fmt.Printf("cannot template more, missing templates: %d\n", toTemplateCount)
-				break TemplatingLoop
+				panic(fmt.Sprintf("cannot template more, missing templates: %d\n", toTemplateCount))
 			}
 		}
 	}
@@ -169,17 +178,19 @@ func (t Templater) ParseConfig(configDir string) (Config, error) {
 	return config, nil
 }
 
-func templateVar(variable string, config *RepositoryConfig) string {
+func templateVar(variable string, repoConfig *RepositoryConfig, config *Config) string {
 	tpl := template.Must(template.New("tpl").Parse(variable))
 	tpl.Option("missingkey=error")
 
 	buf := bytes.NewBuffer(nil)
-	if err := tpl.Execute(buf, makeTemplateVariables(*config)); err != nil {
+	if err := tpl.Execute(buf, makeTemplateVariables(*repoConfig, *config)); err != nil {
+		fmt.Println("@@@@@@@@2 templating err,", err.Error())
 		return ""
 	}
 
 	s := buf.String()
 	if isTemplated(s) {
+		fmt.Printf(">>>>>\nnot templated:\n%s\n>>>>>\n", s)
 		return ""
 	}
 
@@ -211,7 +222,7 @@ func (t Templater) Run(config Config) error {
 				destPath := filepath.Join(t.OutputDirectory, repository.Name, path[len(templateDir):])
 				t.Logger.Printf("copying file %s to %s", path, destPath)
 
-				if err := t.renderFile(path, destPath, *repository); err != nil {
+				if err := t.renderFile(path, destPath, *repository, config); err != nil {
 					return err
 				}
 
@@ -267,7 +278,7 @@ func (t Templater) CopyFile(sourceFile, destFile string) error {
 	return nil
 }
 
-func (t Templater) renderFile(sourceFile, destFile string, config RepositoryConfig) error {
+func (t Templater) renderFile(sourceFile, destFile string, repoConfig RepositoryConfig, config Config) error {
 	destPath := filepath.Dir(destFile)
 	sourcePath := filepath.Dir(sourceFile)
 
@@ -298,9 +309,9 @@ func (t Templater) renderFile(sourceFile, destFile string, config RepositoryConf
 	tpl.Option("missingkey=error")
 
 	buf := bytes.NewBuffer(nil)
-	if err := tpl.Execute(buf, makeTemplateVariables(config)); err != nil {
+	if err := tpl.Execute(buf, makeTemplateVariables(repoConfig, config)); err != nil {
 		// todo - why it is not propagating when occurred?
-		return err
+		panic(err)
 	}
 
 	err = ioutil.WriteFile(destFile, buf.Bytes(), sourceStat.Mode())
