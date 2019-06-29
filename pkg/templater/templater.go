@@ -28,13 +28,42 @@ type Templater struct {
 	Logger          *log.Logger
 }
 
-func (t Templater) ReallyRun(config Config) error {
-	cloneWg := sync.WaitGroup{}
-	cloneWg.Add(len(config.Repositories))
+func (t Templater) repositoriesToRun(config Config, repositoryFilter string) []*RepositoryConfig {
+	if repositoryFilter == "" {
+		return config.Repositories
+	}
 
-	for i := range config.Repositories {
+	for _, repo := range config.Repositories {
+		if repo.Name == repositoryFilter {
+			return []*RepositoryConfig{repo}
+		}
+	}
+
+	panic("repository not found")
+}
+
+func (t Templater) ReallyRun(config Config, branch string, repoFilter string) error {
+	reposToRun := t.repositoriesToRun(config, repoFilter)
+
+	cloneWg := sync.WaitGroup{}
+	cloneWg.Add(len(reposToRun))
+
+	if branch == "" {
+		branch = "master"
+	}
+
+	for i := range reposToRun {
 		go func(repository *RepositoryConfig) {
-			cmd := exec.Command("git", "clone", repository.URL, repository.Name)
+			cmd := exec.Command(
+				"git",
+				"clone",
+				repository.URL,
+				repository.Name,
+				"--single-branch",
+				"--branch",
+				branch,
+			)
+
 			cmd.Stderr = os.Stderr
 			cmd.Stdout = os.Stdout
 			cmd.Dir = t.InputDirectory
@@ -44,18 +73,18 @@ func (t Templater) ReallyRun(config Config) error {
 			}
 
 			cloneWg.Done()
-		}(config.Repositories[i])
+		}(reposToRun[i])
 	}
 
 	cloneWg.Wait()
 
-	if err := t.Run(config); err != nil {
+	if err := t.Run(config, reposToRun); err != nil {
 		return err
 	}
 
 	var repositoriesWithChanges []*RepositoryConfig
 
-	for _, repository := range config.Repositories {
+	for _, repository := range reposToRun {
 		repositoryDir := path.Join(t.InputDirectory, repository.Name)
 
 		if err := t.gitAdd(repositoryDir, "."); err != nil {
@@ -202,8 +231,8 @@ func isTemplated(s string) bool {
 }
 
 // todo - err wraps
-func (t Templater) Run(config Config) error {
-	for _, repository := range config.Repositories {
+func (t Templater) Run(config Config, repositoriesToRun []*RepositoryConfig) error {
+	for _, repository := range repositoriesToRun {
 		var err error
 
 		for _, tpl := range repository.Templates {
@@ -233,13 +262,23 @@ func (t Templater) Run(config Config) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot read input directory")
 		}
-
-		for _, cmd := range repository.RunCmds {
-			if err := t.runCmd(path.Join(t.OutputDirectory, repository.Name), cmd...); err != nil {
-				return errors.Wrap(err, "cannot run cmd")
-			}
-		}
 	}
+
+	cmdsWg := sync.WaitGroup{}
+	cmdsWg.Add(len(repositoriesToRun))
+
+	for i := range repositoriesToRun {
+		go func(repository *RepositoryConfig) {
+			for _, cmd := range repository.RunCmds {
+				if err := t.runCmd(path.Join(t.OutputDirectory, repository.Name), cmd...); err != nil {
+					panic(err)
+				}
+			}
+			cmdsWg.Done()
+		}(repositoriesToRun[i])
+	}
+
+	cmdsWg.Wait()
 
 	return nil
 }

@@ -11,6 +11,8 @@ func main() {
 	commitMsg := flag.String("commit-msg", "update repository template", "")
 	push := flag.Bool("push", false, "")
 	doNotRemove := flag.Bool("do-not-remove", false, "")
+	repository := flag.String("repository", "limit run to one repository", "")     // todo
+	branch := flag.String("branch", "clone repositories from provided branch", "") // todo
 
 	flag.Parse()
 
@@ -48,7 +50,7 @@ func main() {
 		}
 	}()
 
-	if err := t.ReallyRun(*config); err != nil {
+	if err := t.ReallyRun(*config, *branch, *repository); err != nil {
 		panic(err)
 	}
 }
