@@ -33,8 +33,8 @@ func (t Templater) gitCommit(runDirectory, msg string) error {
 	return t.runGitCmd(runDirectory, "commit", "-m", msg)
 }
 
-func (t Templater) gitPush(runDirectory string) error {
-	return t.runGitCmd(runDirectory, "push")
+func (t Templater) gitPush(runDirectory, branch string) error {
+	return t.runGitCmd(runDirectory, "push", "-u", "origin", branch)
 }
 
 func (t Templater) hasUncommittedChanges(runDirectory string) (bool, error) {

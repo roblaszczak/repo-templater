@@ -28,9 +28,25 @@ type Templater struct {
 	Logger          *log.Logger
 }
 
-func (t Templater) repositoriesToRun(config Config, repositoryFilter string) []*RepositoryConfig {
+func (t Templater) repositoriesToRun(config Config, repositoryFilter string, skipRepos []string) []*RepositoryConfig {
 	if repositoryFilter == "" {
-		return config.Repositories
+		var reposToRun []*RepositoryConfig
+
+		for _, repo := range config.Repositories {
+			found := false
+			for _, repoToSkip := range skipRepos {
+				if repoToSkip == repo.Name {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				reposToRun = append(reposToRun, repo)
+			}
+		}
+
+		return reposToRun
 	}
 
 	for _, repo := range config.Repositories {
@@ -42,8 +58,8 @@ func (t Templater) repositoriesToRun(config Config, repositoryFilter string) []*
 	panic("repository not found")
 }
 
-func (t Templater) ReallyRun(config Config, branch string, repoFilter string) error {
-	reposToRun := t.repositoriesToRun(config, repoFilter)
+func (t Templater) ReallyRun(config Config, branch string, repoFilter string, skipRepos []string) error {
+	reposToRun := t.repositoriesToRun(config, repoFilter, skipRepos)
 
 	cloneWg := sync.WaitGroup{}
 	cloneWg.Add(len(reposToRun))
@@ -68,10 +84,37 @@ func (t Templater) ReallyRun(config Config, branch string, repoFilter string) er
 			cmd.Stdout = os.Stdout
 			cmd.Dir = t.InputDirectory
 
+			// todo - better err handling - it should only run if "Remote branch [branch] not found in upstream origin"
 			if err := cmd.Run(); err != nil {
-				panic(errors.Wrapf(err, "cannot clone %s", repository.Name))
-			}
+				cloneDefaultBranchCmd := exec.Command(
+					"git",
+					"clone",
+					repository.URL,
+					repository.Name,
+					"--single-branch",
+				)
 
+				cloneDefaultBranchCmd.Stderr = os.Stderr
+				cloneDefaultBranchCmd.Stdout = os.Stdout
+				cloneDefaultBranchCmd.Dir = t.InputDirectory
+				if err := cloneDefaultBranchCmd.Run(); err != nil {
+					panic(err)
+				}
+
+				checkoutCmd := exec.Command(
+					"git",
+					"checkout",
+					"-B",
+					branch,
+				)
+
+				checkoutCmd.Stderr = os.Stderr
+				checkoutCmd.Stdout = os.Stdout
+				checkoutCmd.Dir = path.Join(t.InputDirectory, repository.Name)
+				if err := checkoutCmd.Run(); err != nil {
+					panic(errors.Wrapf(err, "cannot checkout %s", repository.Name))
+				}
+			}
 			cloneWg.Done()
 		}(reposToRun[i])
 	}
@@ -123,7 +166,7 @@ func (t Templater) ReallyRun(config Config, branch string, repoFilter string) er
 
 	if t.Push {
 		for _, repository := range repositoriesWithChanges {
-			if err := t.gitPush(path.Join(t.InputDirectory, repository.Name)); err != nil {
+			if err := t.gitPush(path.Join(t.InputDirectory, repository.Name), branch); err != nil {
 				return errors.Wrapf(err, "cannot push %s", repository.Name)
 			}
 		}
